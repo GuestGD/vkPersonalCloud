@@ -1,3 +1,5 @@
+import os
+import random
 import requests
 
 from .config import VK_TOKEN, GROUP_ID, API_VERSION
@@ -19,69 +21,24 @@ def _raise(resp, ctx):
                            (ctx, e.get("error_msg"), e.get("error_code")))
 
 
-# ---------------- Альбомы ----------------
-
-def list_albums():
-    """{title: album_id} — только альбомы группы."""
-    r = call("photos.getAlbums", {"owner_id": -GROUP_ID, "need_system": 1})
-    _raise(r, "getAlbums")
-    return {a["title"]: a["id"] for a in r["response"]["items"]}
-
-
-def create_album(title):
-    r = call("photos.createAlbum", {
-        "group_id": GROUP_ID,
-        "title": title,
-        "privacy_view": "all",
-        "privacy_comment": "all",
-    })
-    _raise(r, "createAlbum")
-    return r["response"]["id"]
-
-
-# ---------------- Фото ----------------
-
-def upload_photo(path, album_id):
-    r = call("photos.getUploadServer", {
-             "group_id": GROUP_ID, "album_id": album_id})
-    _raise(r, "getUploadServer")
-    url = r["response"]["upload_url"]
-
-    with open(path, "rb") as fh:
-        up = requests.post(url, files={"file1": fh}, timeout=180).json()
-    if "server" not in up:
-        raise RuntimeError("photo upload: %s" % str(up)[:200])
-
-    s = call("photos.save", {
-        "group_id": GROUP_ID,
-        "album_id": album_id,
-        "server": up["server"],
-        "photos_list": up["photos_list"],
-        "hash": up["hash"],
-    })
-    _raise(s, "photos.save")
-    return s["response"]
-
-
-# ---------------- Видео → документы группы ----------------
-
-def upload_video_doc(path, name):
+def upload_to_docs(path, name):
+    """Загружает любой файл (фото или видео) в документы группы."""
     r = call("docs.getWallUploadServer", {"group_id": GROUP_ID})
     _raise(r, "getWallUploadServer")
     url = r["response"]["upload_url"]
 
     with open(path, "rb") as fh:
-        # Увеличиваем таймаут до 30 минут для больших файлов
+        # 30 минут на файл, чтобы не отваливалось по таймауту
         resp = requests.post(url, files={"file": (name, fh)}, timeout=1800)
 
     try:
         up = resp.json()
     except ValueError:
         raise RuntimeError(
-            "ВК вернул не JSON (HTTP %s). Возможно, файл слишком большой для ВК или оборвалась сеть." % resp.status_code)
+            "ВК вернул не JSON (HTTP %s). Возможно, оборвалась сеть." % resp.status_code)
 
     if "file" not in up:
-        raise RuntimeError("video upload error: %s" % str(up)[:200])
+        raise RuntimeError("upload error: %s" % str(up)[:200])
 
     s = call("docs.save", {"file": up["file"], "title": name})
     _raise(s, "docs.save")

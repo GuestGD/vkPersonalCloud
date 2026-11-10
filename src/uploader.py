@@ -2,29 +2,14 @@ import os
 import time
 import shutil
 
-from . import config, dates, vkapi
+from . import config, vkapi
 
+# Оставляем только поддерживаемые расширения для фильтрации мусора
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".3gp", ".webm"}
 SUPPORTED = PHOTO_EXTS | VIDEO_EXTS
+
 MIN_AGE = 3  # сек — не трогать файл, который только что начал писаться
-
-
-class Session:
-    """Кэш альбомов на время одного запуска (без файла состояния)."""
-
-    def __init__(self):
-        self._albums = None
-
-    def album_id(self, title):
-        if self._albums is None:
-            self._albums = vkapi.list_albums()
-        if title in self._albums:
-            return self._albums[title]
-        aid = vkapi.create_album(title)
-        self._albums[title] = aid
-        print("  + создан альбом %s" % title)
-        return aid
 
 
 def _stable(path):
@@ -68,12 +53,8 @@ def _unique_dest(name):
 def _move(path):
     os.makedirs(config.UPLOADED_DIR, exist_ok=True)
     dest = _unique_dest(os.path.basename(path))
-    shutil.move(path, dest)  # os.rename если та же ФС, copy+del иначе
+    shutil.move(path, dest)
     return dest
-
-
-def _is_photo(name):
-    return os.path.splitext(name)[1].lower() in PHOTO_EXTS
 
 
 def run(folder, limit):
@@ -84,24 +65,16 @@ def run(folder, limit):
     if not paths:
         return result
 
-    session = Session()
     for i, path in enumerate(paths, 1):
         name = os.path.basename(path)
         size_mb = os.path.getsize(path) / (1024 * 1024)
-        print("[%d/%d] %s (%.1f МБ)" % (i, len(paths), name, size_mb), flush=True)
+        print("[%d/%d] %s (%.1f МБ)" %
+              (i, len(paths), name, size_mb), flush=True)
 
         try:
-            if _is_photo(name):
-                d = dates.get_date(path)
-                if not d:
-                    raise RuntimeError("не смог определить дату")
-                title = dates.album_title(d)
-                aid = session.album_id(title)
-                vkapi.upload_photo(path, aid)
-                print("  ✓ фото → альбом %s" % title)
-            else:
-                vkapi.upload_video_doc(path, name)
-                print("  ✓ видео → документы группы")
+            # Грузим ВСЁ через функцию документов
+            vkapi.upload_to_docs(path, name)
+            print("  ✓ загружено в документы группы")
 
             dest = _move(path)
             print("  ✓ перемещён → %s" % dest)
