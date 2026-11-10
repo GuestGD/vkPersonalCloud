@@ -71,9 +71,17 @@ def upload_video_doc(path, name):
     url = r["response"]["upload_url"]
 
     with open(path, "rb") as fh:
-        up = requests.post(url, files={"file": (name, fh)}, timeout=900).json()
+        # Увеличиваем таймаут до 30 минут для больших файлов
+        resp = requests.post(url, files={"file": (name, fh)}, timeout=1800)
+
+    try:
+        up = resp.json()
+    except ValueError:
+        raise RuntimeError(
+            "ВК вернул не JSON (HTTP %s). Возможно, файл слишком большой для ВК или оборвалась сеть." % resp.status_code)
+
     if "file" not in up:
-        raise RuntimeError("video upload: %s" % str(up)[:200])
+        raise RuntimeError("video upload error: %s" % str(up)[:200])
 
     s = call("docs.save", {"file": up["file"], "title": name})
     _raise(s, "docs.save")
