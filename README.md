@@ -8,8 +8,12 @@
 ## Установка (Termux)
 
 ```bash
-pkg install git python termux-api
+pkg update -y && pkg upgrade -y
+pkg install git python termux-api python-requests python-pillow -y
+
+termux-setup-storage
+
 git clone https://github.com/GuestGD/vkPersonalCloud.git
-cd vk-cloud-phone
-python3 vkCloud.py
+cd vkPersonalCloud
+python vkCloud.py
 ```
