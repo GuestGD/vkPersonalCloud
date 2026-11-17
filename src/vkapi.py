@@ -43,3 +43,16 @@ def upload_to_docs(path, name):
     s = call("docs.save", {"file": up["file"], "title": name})
     _raise(s, "docs.save")
     return s["response"]["doc"]
+
+
+def list_docs(count=20, offset=0):
+    """Запрашивает список документов группы."""
+    r = call("docs.get", {
+        "owner_id": -GROUP_ID,
+        "count": count,
+        "offset": offset,
+    })
+    if "error" in r:
+        # Выведем сырой ответ ошибки, чтобы видеть точный код и текст от VK
+        raise RuntimeError("docs.get raw error: %s" % r["error"])
+    return r["response"]
