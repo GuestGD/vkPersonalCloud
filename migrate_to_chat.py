@@ -84,8 +84,10 @@ def main():
     print("-" * 60)
     locked = _wake_lock()
     ok, failed = 0, 0
+    idx = 0
     try:
-        for i, item in enumerate(to_send, 1):
+        while idx < len(to_send):
+            item = to_send[idx]
             title = item.get("title") or ("doc_%s" % item["id"])
             size_bytes = int(item.get("size") or 0)
             ext = item.get("ext") or ""
@@ -94,27 +96,34 @@ def main():
                                             (item["owner_id"], item["id"]))
 
             text = vkapi.build_doc_message(
-                title, size_bytes, ext=ext, timestamp=date_ts
+                title,
+                size_bytes,
+                ext=ext,
+                timestamp=date_ts,
+                doc_link=vkapi.doc_eternal_url(attach),
             )
 
             try:
                 vkapi.send_doc_message(peer_id, attach, text)
                 ok += 1
-                print("[%d/%d] ✓ %s" % (i, len(to_send), title), flush=True)
-            except vkapi.FloodControlError as exc:
-                failed += 1
-                print("[%d/%d] ✗ %s: %s" %
-                      (i, len(to_send), title, exc), flush=True)
-                print("\n[!] Сработал лимит ВК (100 сообщений за окно).")
-                print("    Подожди 15-60 минут и запусти скрипт снова — первые %d уже пропустятся." %
-                      (len(existing) + ok))
-                break
+                print("[%d/%d] ✓ %s" %
+                      (idx + 1, len(to_send), title), flush=True)
+                idx += 1
+                time.sleep(0.4)
+            except vkapi.FloodControlError:
+                print("\n[!] Лимит ВК: 100 сообщений подряд без ответа.")
+                try:
+                    input(
+                        "    Напиши любое сообщение в чат группы (хоть '.') и нажми Enter (Ctrl+C — выход): ")
+                except (KeyboardInterrupt, EOFError):
+                    print("\nОстановлено пользователем.")
+                    break
             except Exception as exc:
                 failed += 1
                 print("[%d/%d] ✗ %s: %s" %
-                      (i, len(to_send), title, exc), flush=True)
-
-            time.sleep(0.4)
+                      (idx + 1, len(to_send), title, exc), flush=True)
+                idx += 1
+                time.sleep(0.4)
     finally:
         if locked:
             _wake_unlock()

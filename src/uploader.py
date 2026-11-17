@@ -118,7 +118,11 @@ def run(folder, limit):
                 print("  ✓ загружено в документы группы")
 
             text = vkapi.build_doc_message(
-                name, size_bytes, timestamp=mtime, folder=folder
+                name,
+                size_bytes,
+                timestamp=mtime,
+                folder=folder,
+                doc_link=vkapi.doc_eternal_url(attach),
             )
             vkapi.send_doc_message(peer_id, attach, text)
             print("  ✓ добавлено в чат облака")
@@ -133,7 +137,8 @@ def run(folder, limit):
 
         except vkapi.FloodControlError as exc:
             print("  ✗ %s" % exc)
-            print("[!] Антифлуд-лимит ВК. Подожди 15-60 мин и запусти снова.")
+            print(
+                "[!] Лимит 100 сообщений подряд. Отправь любое сообщение в чат группы и запусти снова.")
             result["failed"] += 1
             break
 

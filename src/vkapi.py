@@ -72,7 +72,18 @@ def format_size(size_bytes):
     return "%d КБ" % max(1, size_bytes // 1024)
 
 
-def build_doc_message(title, size_bytes, ext="", timestamp=0, folder=None):
+def doc_eternal_url(doc_or_attach):
+    if isinstance(doc_or_attach, dict):
+        return "https://vk.ru/doc%s_%s" % (
+            doc_or_attach["owner_id"], doc_or_attach["id"]
+        )
+    m = re.search(r"doc(-?\d+_\d+)", str(doc_or_attach))
+    if m:
+        return "https://vk.ru/doc" + m.group(1)
+    return None
+
+
+def build_doc_message(title, size_bytes, ext="", timestamp=0, folder=None, doc_link=None):
     ext_raw = (ext or os.path.splitext(title)[1].lstrip(".")).lower()
     ext_tag = re.sub(r"[^a-z0-9а-яё_]", "", ext_raw)
 
@@ -108,7 +119,10 @@ def build_doc_message(title, size_bytes, ext="", timestamp=0, folder=None):
         if dir_tag:
             tags.append("#dir_" + dir_tag)
 
-    return "%s\n%s · %s" % (" ".join(tags), title, format_size(size_bytes))
+    msg = "%s\n%s · %s" % (" ".join(tags), title, format_size(size_bytes))
+    if type_tag == "#видео" and doc_link:
+        msg += "\n▶️ Смотреть онлайн: " + doc_link
+    return msg
 
 
 def doc_to_attachment(doc):
