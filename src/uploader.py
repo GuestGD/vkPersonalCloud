@@ -4,7 +4,6 @@ import shutil
 
 from . import config, vkapi
 
-# Оставляем только поддерживаемые расширения для фильтрации мусора
 PHOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".3gp", ".webm"}
 SUPPORTED = PHOTO_EXTS | VIDEO_EXTS
@@ -65,16 +64,25 @@ def run(folder, limit):
     if not paths:
         return result
 
+    peer_id = vkapi.get_peer_id()
+
     for i, path in enumerate(paths, 1):
         name = os.path.basename(path)
-        size_mb = os.path.getsize(path) / (1024 * 1024)
+        size_bytes = os.path.getsize(path)
+        mtime = os.path.getmtime(path)
+        size_mb = size_bytes / (1024 * 1024)
         print("[%d/%d] %s (%.1f МБ)" %
               (i, len(paths), name, size_mb), flush=True)
 
         try:
-            # Грузим ВСЁ через функцию документов
-            vkapi.upload_to_docs(path, name)
+            doc = vkapi.upload_to_docs(path, name)
             print("  ✓ загружено в документы группы")
+
+            text = vkapi.build_doc_message(
+                name, size_bytes, timestamp=mtime, folder=folder
+            )
+            vkapi.send_doc_message(peer_id, doc, text)
+            print("  ✓ добавлено в чат облака")
 
             dest = _move(path)
             print("  ✓ перемещён → %s" % dest)

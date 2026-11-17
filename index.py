@@ -9,11 +9,10 @@
     python3 index.py /path 20         # папка + количество
 """
 import sys
-import time
 import shutil
 import subprocess
 
-from src import config, uploader, vkapi
+from src import config, uploader
 
 
 def _wake_lock():
@@ -52,38 +51,9 @@ def _parse_args(argv):
     return folder, count
 
 
-def _list_cloud(limit):
-    print("Читаю документы группы %s..." % config.GROUP_ID)
-    print("-" * 60)
-    try:
-        data = vkapi.list_docs(count=limit)
-    except Exception as exc:
-        print("[!] Ошибка:", exc)
-        sys.exit(1)
-
-    total = data.get("count", 0)
-    items = data.get("items", [])
-    print("Всего документов в группе: %d (показано %d)" % (total, len(items)))
-    for i, doc in enumerate(items, 1):
-        size_mb = doc.get("size", 0) / (1024 * 1024)
-        dt = time.strftime(
-            "%Y-%m-%d %H:%M", time.localtime(doc.get("date", 0)))
-        print("%2d. [id=%s] %s (%.1f МБ, %s)" % (
-            i, doc.get("id"), doc.get("title"), size_mb, dt
-        ))
-
-
 def main():
     if len(sys.argv) == 2 and sys.argv[1] in ("-h", "--help"):
         print(__doc__)
-        return
-
-    if len(sys.argv) >= 2 and sys.argv[1] in ("-l", "--list"):
-        try:
-            limit = int(sys.argv[2]) if len(sys.argv) >= 3 else 20
-        except ValueError:
-            sys.exit("[!] Количество должно быть числом")
-        _list_cloud(limit)
         return
 
     folder, count = _parse_args(sys.argv[1:])
