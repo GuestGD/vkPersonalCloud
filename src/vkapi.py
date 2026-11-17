@@ -17,6 +17,10 @@ _DATE_RE = re.compile(
 _PEER_ID_CACHE = None
 
 
+class FloodControlError(RuntimeError):
+    pass
+
+
 def call(method, params=None, timeout=30):
     data = dict(params or {})
     data["access_token"] = config.VK_TOKEN
@@ -27,9 +31,11 @@ def call(method, params=None, timeout=30):
 def _raise(resp, ctx):
     if "error" in resp:
         e = resp["error"]
-        raise RuntimeError(
-            "%s: %s (%s)" % (ctx, e.get("error_msg"), e.get("error_code"))
-        )
+        code = e.get("error_code")
+        msg = "%s: %s (%s)" % (ctx, e.get("error_msg"), code)
+        if code == 9:
+            raise FloodControlError(msg)
+        raise RuntimeError(msg)
 
 
 def get_peer_id():
@@ -155,12 +161,13 @@ def send_doc_message(peer_id, doc, text, retries=3):
             )
             if "error" in r:
                 code = r["error"].get("error_code")
-                # 6 = Too many requests per second
                 if code == 6 and attempt < retries:
                     time.sleep(1.5 * attempt)
                     continue
                 _raise(r, "messages.send")
             return r["response"]
+        except FloodControlError:
+            raise
         except Exception as exc:
             last_err = exc
             if attempt < retries:
@@ -181,9 +188,10 @@ def delete_messages(msg_ids):
     _raise(r, "messages.delete")
 
 
-def get_chat_doc_keys(peer_id):
-    """Возвращает множество 'doc{owner_id}_{id}' всех документов, уже лежащих в чате."""
+def get_chat_index(peer_id):
+    """Возвращает (set('doc{owner}_{id}'), set((title, size))) всех документов в чате."""
     keys = set()
+    meta = set()
     offset = 0
     while True:
         r = call(
@@ -201,10 +209,11 @@ def get_chat_doc_keys(peer_id):
                 if att.get("type") == "doc":
                     d = att["doc"]
                     keys.add("doc%s_%s" % (d["owner_id"], d["id"]))
+                    meta.add((d.get("title", ""), int(d.get("size") or 0)))
 
         offset += len(items)
         if offset >= resp.get("count", 0):
             break
         time.sleep(0.25)
 
-    return keys
+    return keys, meta

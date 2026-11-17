@@ -64,10 +64,9 @@ def main():
     _cleanup_test_messages(peer_id)
 
     print("Проверяю, что уже есть в чате...")
-    existing = vkapi.get_chat_doc_keys(peer_id)
+    existing, _ = vkapi.get_chat_index(peer_id)
     print("Уже в чате документов:", len(existing))
 
-    # Идём с конца JSON (от старых файлов к новым), убираем дубли
     to_send = []
     seen = set(existing)
     for item in reversed(docs):
@@ -102,6 +101,14 @@ def main():
                 vkapi.send_doc_message(peer_id, attach, text)
                 ok += 1
                 print("[%d/%d] ✓ %s" % (i, len(to_send), title), flush=True)
+            except vkapi.FloodControlError as exc:
+                failed += 1
+                print("[%d/%d] ✗ %s: %s" %
+                      (i, len(to_send), title, exc), flush=True)
+                print("\n[!] Сработал лимит ВК (100 сообщений за окно).")
+                print("    Подожди 15-60 минут и запусти скрипт снова — первые %d уже пропустятся." %
+                      (len(existing) + ok))
+                break
             except Exception as exc:
                 failed += 1
                 print("[%d/%d] ✗ %s: %s" %
@@ -113,7 +120,7 @@ def main():
             _wake_unlock()
 
     print("-" * 60)
-    print("Готово! Перенесено: %d, ошибок: %d" % (ok, failed))
+    print("Итог запуска: перенесено %d, ошибок %d" % (ok, failed))
 
 
 if __name__ == "__main__":
